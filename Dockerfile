@@ -23,4 +23,4 @@ RUN mkdir -p /app/uploads/logos
 
 EXPOSE $PORT
 
-CMD alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
