@@ -46,7 +46,7 @@ async def cmd_start(
                 shop_id=target_shop.id,
                 plan="trial",
                 status="active",
-                trial_ends_at=datetime.utcnow() + timedelta(days=14),
+                trial_ends_at=datetime.utcnow() + timedelta(days=1),
             )
             db.add(sub)
             db.commit()
