@@ -1,0 +1,1 @@
+from app.middlewares.shop_context import ShopContextMiddleware
