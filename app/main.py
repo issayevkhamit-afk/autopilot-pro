@@ -19,13 +19,7 @@ from app.handlers.worker import router as worker_router
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── Create schema + tables ─────────────────────────────────────────────────
-from sqlalchemy import text
-with engine.connect() as conn:
-    conn.execute(text("CREATE SCHEMA IF NOT EXISTS autopilot"))
-    conn.commit()
-
-Base.metadata.schema = "autopilot"
+# ── Create tables ──────────────────────────────────────────────────────────
 Base.metadata.create_all(bind=engine)
 
 # ── Bot & Dispatcher ────────────────────────────────────────────────────────
