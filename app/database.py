@@ -8,7 +8,7 @@ engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
 @event.listens_for(engine, "connect")
 def _set_search_path(dbapi_conn, _):
     cursor = dbapi_conn.cursor()
-    cursor.execute("SET search_path TO autopilot, public")
+    cursor.execute("SET search_path TO autopilot")
     cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
