@@ -69,7 +69,8 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
     style_right  = ParagraphStyle("right",  fontName=font_name, fontSize=9, alignment=TA_RIGHT)
 
     currency = getattr(shop, "currency", "KZT") or "KZT"
-    cur_sym  = "₸" if currency == "KZT" else currency
+    _sym_map = {"KZT": "KZT ", "UZS": "UZS ", "KGS": "KGS "}
+    cur_sym  = _sym_map.get(currency, currency + " ")
 
     story = []
 
@@ -121,9 +122,8 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
         story.append(Spacer(1, 4))
         table_data = [["Наименование работы", "Кол-во", "Цена", "Сумма"]]
         for item in estimate["labor"]:
-            manual = " *" if item.get("is_manual") else ""
             table_data.append([
-                Paragraph(item["name"] + manual, style_normal),
+                Paragraph(item["name"], style_normal),
                 str(item["qty"]),
                 f"{cur_sym}{item['unit_price']:,.0f}",
                 f"{cur_sym}{item['total_price']:,.0f}",
@@ -143,9 +143,8 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
         story.append(Spacer(1, 4))
         table_data = [["Наименование запчасти", "Кол-во", "Цена", "Сумма"]]
         for item in estimate["parts"]:
-            manual = " *" if item.get("is_manual") else ""
             table_data.append([
-                Paragraph(item["name"] + manual, style_normal),
+                Paragraph(item["name"], style_normal),
                 f"{item['qty']} {item.get('unit','').replace('pcs','шт').replace('liter','л').replace('liters','л')}",
                 f"{cur_sym}{item['unit_price']:,.0f}",
                 f"{cur_sym}{item['total_price']:,.0f}",
@@ -173,12 +172,6 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
         story.append(Spacer(1, 12))
         story.append(Paragraph(f"Примечание: {estimate['notes']}", style_normal))
 
-    if estimate.get("has_manual_prices"):
-        story.append(Spacer(1, 8))
-        story.append(Paragraph(
-            "* Цены, отмеченные звёздочкой, являются ориентировочными (не найдены в прайс-листе сервиса).",
-            ParagraphStyle("disc", fontName=font_name, fontSize=8, textColor=colors.grey),
-        ))
 
     def _draw_footer(canvas, doc):
         canvas.saveState()
