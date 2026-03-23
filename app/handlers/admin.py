@@ -48,6 +48,9 @@ async def admin_menu(message: Message, membership: Membership | None, shop: Shop
     if _admin_gate(membership):
         await message.answer("⛔ Доступ только для администраторов.")
         return
+    if not shop:
+        await message.answer("⚠️ Сервис не найден. Попробуйте /start")
+        return
     await message.answer(
         f"⚙️ *Панель управления* — {shop.name}",
         parse_mode="Markdown",
@@ -59,6 +62,9 @@ async def admin_menu(message: Message, membership: Membership | None, shop: Shop
 async def back_to_menu(call: CallbackQuery, membership: Membership | None, shop: Shop | None):
     if _admin_gate(membership):
         await call.answer("⛔ Нет доступа", show_alert=True)
+        return
+    if not shop:
+        await call.answer("⚠️ Сервис не найден", show_alert=True)
         return
     await call.message.edit_text(
         f"⚙️ *Панель управления* — {shop.name}",

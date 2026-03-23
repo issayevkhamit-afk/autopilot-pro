@@ -8,6 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import Update, BotCommand
 
 from app.config import settings
+from sqlalchemy import text
 from app.database import engine, Base
 import app.models  # noqa: F401 — register all models
 
@@ -27,6 +28,17 @@ try:
     logger.info("DB tables created/verified OK")
 except Exception as e:
     logger.error(f"DB create_all failed: {e}\n{traceback.format_exc()}")
+
+# ── Migrations: add new columns to existing tables ─────────────────────────
+try:
+    with engine.connect() as conn:
+        conn.execute(text(
+            "ALTER TABLE autopilot.shops ADD COLUMN IF NOT EXISTS country VARCHAR(5) DEFAULT 'kz'"
+        ))
+        conn.commit()
+    logger.info("DB migrations applied OK")
+except Exception as e:
+    logger.error(f"DB migration failed: {e}")
 
 # ── Bot & Dispatcher ────────────────────────────────────────────────────────
 bot = Bot(token=settings.BOT_TOKEN)
