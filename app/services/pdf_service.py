@@ -111,7 +111,7 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
     known = [p for p in [make, model, year] if p and p.lower() != "unknown"]
     if known:
         car_str = " ".join(known)
-        story.append(Paragraph(f"🚗 Автомобиль: <b>{car_str}</b>", style_normal))
+        story.append(Paragraph(f"Автомобиль: <b>{car_str}</b>", style_normal))
         if car.get("vin"):
             story.append(Paragraph(f"VIN: {car['vin']}", style_normal))
         story.append(Spacer(1, 10))
@@ -145,7 +145,7 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
         for item in estimate["parts"]:
             table_data.append([
                 Paragraph(item["name"], style_normal),
-                f"{item['qty']} {item.get('unit','').replace('pcs','шт').replace('liter','л').replace('liters','л')}",
+                str(item["qty"]),
                 f"{cur_sym}{item['unit_price']:,.0f}",
                 f"{cur_sym}{item['total_price']:,.0f}",
             ])
