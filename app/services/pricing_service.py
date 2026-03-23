@@ -2,7 +2,7 @@ import logging
 from decimal import Decimal
 from sqlalchemy.orm import Session
 from app.models.labor_price import LaborPrice
-from app.models.part_price import PartPrice
+from app.models.global_part_price import GlobalPartPrice
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ def build_estimate(shop_id: int, ai_data: dict, db: Session) -> dict:
 
     # Load all shop prices once
     labor_prices = db.query(LaborPrice).filter(LaborPrice.shop_id == shop_id).all()
-    part_prices = db.query(PartPrice).filter(PartPrice.shop_id == shop_id).all()
+    part_prices = db.query(GlobalPartPrice).all()
 
     # ── Labor ─────────────────────────────────────────────────────────────
     for item in ai_data.get("labor", []):

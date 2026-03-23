@@ -6,7 +6,6 @@ import io
 import logging
 import os
 import uuid
-import pandas as pd
 from decimal import Decimal, InvalidOperation
 
 from aiogram import Router, F, Bot
@@ -15,15 +14,14 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from sqlalchemy.orm import Session
 
+from app.i18n import t
 from app.models.shop import Shop
-from app.models.user import User
 from app.models.membership import Membership
 from app.models.labor_price import LaborPrice
-from app.models.part_price import PartPrice
 from app.states.admin_states import AdminStates
 from app.keyboards.admin_kb import (
-    admin_menu_kb, admin_prices_kb, admin_parts_kb,
-    admin_settings_kb, cancel_kb,
+    admin_menu_kb, admin_prices_kb,
+    admin_settings_kb, cancel_kb, language_picker_kb,
 )
 from app.keyboards.worker_kb import main_menu_kb
 
@@ -46,7 +44,7 @@ def _admin_gate(membership: Membership | None) -> bool:
 
 @router.message(Command("admin"))
 @router.message(F.text == "⚙️ Админ панель")
-async def admin_menu(message: Message, membership: Membership | None, shop: Shop | None):
+async def admin_menu(message: Message, membership: Membership | None, shop: Shop | None, user=None):
     if _admin_gate(membership):
         await message.answer("⛔ Доступ только для администраторов.")
         return
@@ -114,7 +112,7 @@ async def labor_add_start(call: CallbackQuery, state: FSMContext, membership: Me
 
 @router.message(AdminStates.waiting_labor_name)
 async def labor_add_name(message: Message, state: FSMContext):
-    if message.text == "❌ Отмена":
+    if message.text in {"❌ Отмена", "❌ Болдырмау"}:
         await state.clear()
         await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
         return
@@ -124,8 +122,8 @@ async def labor_add_name(message: Message, state: FSMContext):
 
 
 @router.message(AdminStates.waiting_labor_price)
-async def labor_add_price(message: Message, state: FSMContext, db: Session, shop: Shop):
-    if message.text == "❌ Отмена":
+async def labor_add_price(message: Message, state: FSMContext, db: Session, shop: Shop, user=None):
+    if message.text in {"❌ Отмена", "❌ Болдырмау"}:
         await state.clear()
         await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
         return
@@ -142,10 +140,11 @@ async def labor_add_price(message: Message, state: FSMContext, db: Session, shop
 
     await state.clear()
     cur = "₸" if shop.currency == "KZT" else shop.currency
+    lang = user.language if user else "ru"
     await message.answer(
         f"✅ Добавлено: *{labor.name}* — {cur}{labor.price:,.0f}",
         parse_mode="Markdown",
-        reply_markup=main_menu_kb(is_admin=True),
+        reply_markup=main_menu_kb(is_admin=True, lang=lang),
     )
 
 
@@ -181,113 +180,6 @@ async def labor_delete_confirm(call: CallbackQuery, db: Session, membership: Mem
     await call.message.edit_reply_markup(reply_markup=admin_prices_kb())
 
 
-# ── PARTS ──────────────────────────────────────────────────────────────────
-
-@router.callback_query(F.data == "admin:parts")
-async def parts_menu(call: CallbackQuery, membership: Membership | None):
-    if _admin_gate(membership):
-        await call.answer("⛔", show_alert=True)
-        return
-    await call.message.edit_text("🔩 *Управление запчастями*", parse_mode="Markdown", reply_markup=admin_parts_kb())
-    await call.answer()
-
-
-@router.callback_query(F.data == "parts:upload")
-async def parts_upload_start(call: CallbackQuery, state: FSMContext, membership: Membership | None):
-    if _admin_gate(membership):
-        await call.answer("⛔", show_alert=True)
-        return
-    await call.message.answer(
-        "📤 Отправьте файл *CSV или Excel* с прайсом запчастей.\n\n"
-        "Формат колонок (любой порядок):\n"
-        "`name` — название\n`price` — цена\n`brand` — бренд (необязательно)\n`part_number` — артикул (необязательно)",
-        parse_mode="Markdown",
-        reply_markup=cancel_kb(),
-    )
-    await state.set_state(AdminStates.waiting_parts_file)
-    await call.answer()
-
-
-@router.message(AdminStates.waiting_parts_file, F.document)
-async def parts_upload_file(message: Message, state: FSMContext, bot: Bot, db: Session, shop: Shop):
-    if message.text == "❌ Отмена":
-        await state.clear()
-        await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
-        return
-
-    doc = message.document
-    if not doc.file_name.endswith((".csv", ".xlsx", ".xls")):
-        await message.answer("❌ Поддерживаются только CSV и Excel (.xlsx, .xls)")
-        return
-
-    processing = await message.answer("⏳ Обрабатываю файл...")
-    try:
-        file = await bot.get_file(doc.file_id)
-        buf = io.BytesIO()
-        await bot.download_file(file.file_path, destination=buf)
-        buf.seek(0)
-
-        if doc.file_name.endswith(".csv"):
-            df = pd.read_csv(buf)
-        else:
-            df = pd.read_excel(buf)
-
-        df.columns = [c.lower().strip() for c in df.columns]
-
-        required = {"name", "price"}
-        if not required.issubset(set(df.columns)):
-            await processing.edit_text(
-                f"❌ Не найдены обязательные колонки: {required}\n"
-                f"Найдены: {list(df.columns)}"
-            )
-            return
-
-        count = 0
-        for _, row in df.iterrows():
-            try:
-                name = str(row["name"]).strip()
-                price = Decimal(str(row["price"]).replace(" ", "").replace(",", "."))
-                if not name or price <= 0:
-                    continue
-                part = PartPrice(
-                    shop_id=shop.id,
-                    name=name,
-                    price=price,
-                    brand=str(row.get("brand", "")).strip() or None,
-                    part_number=str(row.get("part_number", "")).strip() or None,
-                )
-                db.add(part)
-                count += 1
-            except Exception:
-                continue
-
-        db.commit()
-        await state.clear()
-        await processing.edit_text(f"✅ Загружено *{count}* позиций запчастей.", parse_mode="Markdown")
-
-    except Exception as e:
-        logger.error(f"Parts upload failed: {e}", exc_info=True)
-        await processing.edit_text("❌ Ошибка при обработке файла.")
-
-
-@router.callback_query(F.data == "parts:list")
-async def parts_list(call: CallbackQuery, membership: Membership | None, shop: Shop, db: Session):
-    if _admin_gate(membership):
-        await call.answer("⛔", show_alert=True)
-        return
-    parts = db.query(PartPrice).filter(PartPrice.shop_id == shop.id).limit(30).all()
-    if not parts:
-        await call.answer("Список запчастей пуст.", show_alert=True)
-        return
-    cur = "₸" if shop.currency == "KZT" else shop.currency
-    text = "🔩 *Прайс запчастей (первые 30):*\n\n"
-    for p in parts:
-        brand = f" [{p.brand}]" if p.brand else ""
-        text += f"  • {p.name}{brand} — {cur}{p.price:,.0f}\n"
-    await call.message.edit_text(text, parse_mode="Markdown", reply_markup=admin_parts_kb())
-    await call.answer()
-
-
 # ── LOGO ───────────────────────────────────────────────────────────────────
 
 @router.callback_query(F.data == "admin:logo")
@@ -301,7 +193,7 @@ async def logo_start(call: CallbackQuery, state: FSMContext, membership: Members
 
 
 @router.message(AdminStates.waiting_logo, F.photo)
-async def logo_upload(message: Message, state: FSMContext, bot: Bot, db: Session, shop: Shop):
+async def logo_upload(message: Message, state: FSMContext, bot: Bot, db: Session, shop: Shop, user=None):
     photo = message.photo[-1]  # largest
     file = await bot.get_file(photo.file_id)
     logo_dir = os.path.join(UPLOAD_DIR, "logos")
@@ -317,7 +209,8 @@ async def logo_upload(message: Message, state: FSMContext, bot: Bot, db: Session
     shop.logo_path = logo_path
     db.commit()
     await state.clear()
-    await message.answer("✅ Логотип сохранён!", reply_markup=main_menu_kb(is_admin=True))
+    lang = user.language if user else "ru"
+    await message.answer("✅ Логотип сохранён!", reply_markup=main_menu_kb(is_admin=True, lang=lang))
 
 
 # ── SETTINGS ───────────────────────────────────────────────────────────────
@@ -349,15 +242,16 @@ async def settings_name_start(call: CallbackQuery, state: FSMContext, membership
 
 
 @router.message(AdminStates.waiting_shop_name)
-async def settings_name_save(message: Message, state: FSMContext, db: Session, shop: Shop):
-    if message.text == "❌ Отмена":
+async def settings_name_save(message: Message, state: FSMContext, db: Session, shop: Shop, user=None):
+    if message.text in {"❌ Отмена", "❌ Болдырмау"}:
         await state.clear()
         await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
         return
     shop.name = message.text.strip()
     db.commit()
     await state.clear()
-    await message.answer(f"✅ Название изменено: *{shop.name}*", parse_mode="Markdown", reply_markup=main_menu_kb(is_admin=True))
+    lang = user.language if user else "ru"
+    await message.answer(f"✅ Название изменено: *{shop.name}*", parse_mode="Markdown", reply_markup=main_menu_kb(is_admin=True, lang=lang))
 
 
 @router.callback_query(F.data == "settings:city")
@@ -371,15 +265,16 @@ async def settings_city_start(call: CallbackQuery, state: FSMContext, membership
 
 
 @router.message(AdminStates.waiting_shop_city)
-async def settings_city_save(message: Message, state: FSMContext, db: Session, shop: Shop):
-    if message.text == "❌ Отмена":
+async def settings_city_save(message: Message, state: FSMContext, db: Session, shop: Shop, user=None):
+    if message.text in {"❌ Отмена", "❌ Болдырмау"}:
         await state.clear()
         await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
         return
     shop.city = message.text.strip()
     db.commit()
     await state.clear()
-    await message.answer(f"✅ Город: *{shop.city}*", parse_mode="Markdown", reply_markup=main_menu_kb(is_admin=True))
+    lang = user.language if user else "ru"
+    await message.answer(f"✅ Город: *{shop.city}*", parse_mode="Markdown", reply_markup=main_menu_kb(is_admin=True, lang=lang))
 
 
 @router.callback_query(F.data == "settings:phone")
@@ -393,15 +288,16 @@ async def settings_phone_start(call: CallbackQuery, state: FSMContext, membershi
 
 
 @router.message(AdminStates.waiting_shop_phone)
-async def settings_phone_save(message: Message, state: FSMContext, db: Session, shop: Shop):
-    if message.text == "❌ Отмена":
+async def settings_phone_save(message: Message, state: FSMContext, db: Session, shop: Shop, user=None):
+    if message.text in {"❌ Отмена", "❌ Болдырмау"}:
         await state.clear()
         await message.answer("Отменено.", reply_markup=ReplyKeyboardRemove())
         return
     shop.phone = message.text.strip()
     db.commit()
     await state.clear()
-    await message.answer(f"✅ Телефон: *{shop.phone}*", parse_mode="Markdown", reply_markup=main_menu_kb(is_admin=True))
+    lang = user.language if user else "ru"
+    await message.answer(f"✅ Телефон: *{shop.phone}*", parse_mode="Markdown", reply_markup=main_menu_kb(is_admin=True, lang=lang))
 
 
 # ── ESTIMATES HISTORY ──────────────────────────────────────────────────────
@@ -429,6 +325,36 @@ async def estimates_history(call: CallbackQuery, membership: Membership | None, 
         status_icon = {"confirmed": "✅", "cancelled": "❌", "draft": "📝"}.get(e.status, "📝")
         text += f"{status_icon} #{e.id} | {car} | {cur}{e.total:,.0f} | {e.created_at.strftime('%d.%m.%y')}\n"
     await call.message.edit_text(text, parse_mode="Markdown", reply_markup=admin_menu_kb())
+    await call.answer()
+
+
+# ── LANGUAGE ───────────────────────────────────────────────────────────────
+
+@router.callback_query(F.data == "admin:language")
+async def language_menu(call: CallbackQuery, membership: Membership | None):
+    if _admin_gate(membership):
+        await call.answer("⛔", show_alert=True)
+        return
+    await call.message.edit_text("🌐 Выберите язык интерфейса:", reply_markup=language_picker_kb())
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("setlang:"))
+async def set_language(call: CallbackQuery, membership: Membership | None, db: Session, user=None):
+    if _admin_gate(membership):
+        await call.answer("⛔", show_alert=True)
+        return
+    lang = call.data.split(":")[1]
+    if lang not in ("ru", "kz", "uz"):
+        await call.answer("❌ Неизвестный язык", show_alert=True)
+        return
+    if user:
+        user.language = lang
+        db.commit()
+    await call.message.edit_text(
+        t(f"language_set_{lang}", lang),
+        reply_markup=admin_menu_kb(),
+    )
     await call.answer()
 
 

@@ -74,45 +74,42 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
     story = []
 
     # ── HEADER ────────────────────────────────────────────────────────────
-    header_data = []
+    style_smeta = ParagraphStyle(
+        "smeta", fontName=font_name_bold, fontSize=26,
+        textColor=TEAL, alignment=TA_CENTER, spaceAfter=6,
+    )
+    story.append(Paragraph("СМЕТА", style_smeta))
 
-    # Logo column
+    # Logo + date row (no shop name)
     logo_cell = []
     if shop.logo_path and os.path.exists(shop.logo_path):
         logo_cell.append(Image(shop.logo_path, width=3 * cm, height=3 * cm))
-    else:
-        logo_cell.append(Paragraph("🔧", style_h1))
 
-    # Shop info column
-    shop_cell = [
-        Paragraph(shop.name or "AutoPilot Pro", style_h1),
-    ]
-    if getattr(shop, "city", None):
-        shop_cell.append(Paragraph(shop.city, style_normal))
-    if getattr(shop, "phone", None):
-        shop_cell.append(Paragraph(shop.phone, style_normal))
-    if getattr(shop, "address", None):
-        shop_cell.append(Paragraph(shop.address, style_normal))
-
-    # Date column
     date_cell = [
-        Paragraph("СМЕТА", ParagraphStyle("sm", fontName=font_name_bold, fontSize=22, textColor=TEAL, alignment=TA_RIGHT)),
         Paragraph(f"Дата: {datetime.now().strftime('%d.%m.%Y')}", style_right),
         Paragraph(f"№ {datetime.now().strftime('%Y%m%d%H%M')}", style_right),
     ]
 
-    header_table = Table([[logo_cell, shop_cell, date_cell]], colWidths=[3.5 * cm, 9 * cm, 5 * cm])
+    if logo_cell:
+        header_table = Table([[logo_cell, date_cell]], colWidths=[13.5 * cm, 4 * cm])
+    else:
+        header_table = Table([["", date_cell]], colWidths=[13.5 * cm, 4 * cm])
     header_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
     ]))
     story.append(header_table)
-    story.append(HRFlowable(width="100%", thickness=2, color=TEAL, spaceAfter=12))
+    story.append(HRFlowable(width="100%", thickness=1, color=TEAL, spaceBefore=4, spaceAfter=12))
 
     # ── CAR INFO ──────────────────────────────────────────────────────────
     car = estimate.get("car", {})
-    car_str = f"{car.get('make','')} {car.get('model','')} {car.get('year','')}".strip()
-    if car_str:
+    make  = car.get("make", "").strip()
+    model = car.get("model", "").strip()
+    year  = car.get("year", "").strip()
+    # Only show if we have real data (not empty / "Unknown")
+    known = [p for p in [make, model, year] if p and p.lower() != "unknown"]
+    if known:
+        car_str = " ".join(known)
         story.append(Paragraph(f"🚗 Автомобиль: <b>{car_str}</b>", style_normal))
         if car.get("vin"):
             story.append(Paragraph(f"VIN: {car['vin']}", style_normal))
@@ -149,7 +146,7 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
             manual = " *" if item.get("is_manual") else ""
             table_data.append([
                 Paragraph(item["name"] + manual, style_normal),
-                f"{item['qty']} {item.get('unit','')}",
+                f"{item['qty']} {item.get('unit','').replace('pcs','шт').replace('liter','л').replace('liters','л')}",
                 f"{cur_sym}{item['unit_price']:,.0f}",
                 f"{cur_sym}{item['total_price']:,.0f}",
             ])
@@ -183,13 +180,14 @@ def generate_pdf(estimate: dict, shop: object, output_path: str | None = None) -
             ParagraphStyle("disc", fontName=font_name, fontSize=8, textColor=colors.grey),
         ))
 
-    story.append(Spacer(1, 20))
-    story.append(Paragraph(
-        "Создано с помощью AutoPilot Pro · t.me/AutoPilotProBot",
-        ParagraphStyle("footer", fontName=font_name, fontSize=8, textColor=colors.grey, alignment=TA_CENTER),
-    ))
+    def _draw_footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont(font_name, 8)
+        canvas.setFillColor(colors.grey)
+        canvas.drawString(2 * cm, 1.2 * cm, "Создано с помощью AutoPilot Pro")
+        canvas.restoreState()
 
-    doc.build(story)
+    doc.build(story, onFirstPage=_draw_footer, onLaterPages=_draw_footer)
     return output_path
 
 

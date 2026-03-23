@@ -1,25 +1,54 @@
 """
-/start handler — supports deep links: /start SHOP_SLUG
-First user to join a slug becomes admin, rest become workers.
+/start handler — deep links, language picker, shop greeting.
+/newshop — create new shop as admin.
 """
 import logging
 import secrets
 import traceback
-from aiogram import Router
-from aiogram.filters import CommandStart, CommandObject, Command
-from aiogram.types import Message
-from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
+from aiogram import Router, F
+from aiogram.filters import CommandStart, CommandObject, Command
+from aiogram.types import Message, CallbackQuery
+from sqlalchemy.orm import Session
+
+from app.config import settings
+from app.i18n import t
 from app.models.shop import Shop
 from app.models.membership import Membership
 from app.models.subscription import Subscription
 from app.models.user import User
-from app.keyboards.worker_kb import main_menu_kb
+from app.keyboards.worker_kb import main_menu_kb, language_picker_kb
 
 router = Router()
 logger = logging.getLogger(__name__)
 
+
+# ── Language picker ───────────────────────────────────────────────────────────
+
+@router.callback_query(F.data.startswith("lang:"))
+async def cb_set_language(
+    call: CallbackQuery,
+    db: Session | None = None,
+    user: User | None = None,
+):
+    lang = call.data.split(":")[1]  # ru | kz
+    if db and user:
+        try:
+            user.language = lang
+            db.commit()
+        except Exception as e:
+            logger.error(f"set language error: {e}")
+
+    key = "language_set_ru" if lang == "ru" else "language_set_kz"
+    await call.message.edit_text(t(key, lang))
+    await call.answer()
+
+    # Re-show start greeting with chosen language
+    await _send_greeting(call.message, db, user, lang, shop=None, membership=None)
+
+
+# ── /start ────────────────────────────────────────────────────────────────────
 
 @router.message(CommandStart())
 async def cmd_start(
@@ -30,39 +59,37 @@ async def cmd_start(
     shop: Shop | None = None,
     membership: Membership | None = None,
 ):
-    logger.info(f"/start from user={message.from_user.id} args={command.args!r}")
+    logger.info(f"/start user={message.from_user.id} args={command.args!r}")
+    lang = user.language if user else "ru"
 
-    # ── Minimal guaranteed response (works even if DB is down) ────────────
     if db is None:
-        logger.error("/start: db is None — DB connection failed")
-        await message.answer(
-            "⚠️ Сервис временно недоступен. Попробуйте позже.",
-            reply_markup=main_menu_kb(is_admin=False),
-        )
+        await message.answer(t("service_unavailable", lang))
         return
 
     slug = (command.args or "").strip() or None
 
+    # First ever start with no language set → show language picker
+    if user and not user.language:
+        await message.answer(t("choose_language", lang), reply_markup=language_picker_kb())
+        return
+
     try:
-        # ── Deep link flow ────────────────────────────────────────────────────
         if slug:
             target_shop = db.query(Shop).filter(Shop.slug == slug).first()
-
             if not target_shop:
-                target_shop = Shop(slug=slug, name="Мой автосервис")
+                target_shop = Shop(slug=slug, name="Мой автосервис", language=lang)
                 db.add(target_shop)
                 db.flush()
-
                 sub = Subscription(
                     shop_id=target_shop.id,
                     plan="trial",
                     status="active",
-                    trial_ends_at=datetime.utcnow() + timedelta(days=1),
+                    trial_ends_at=datetime.utcnow() + timedelta(hours=settings.TRIAL_HOURS),
                 )
                 db.add(sub)
                 db.commit()
                 db.refresh(target_shop)
-                logger.info(f"New shop created: slug={slug} id={target_shop.id}")
+                logger.info(f"New shop slug={slug} id={target_shop.id}")
 
             existing = (
                 db.query(Membership)
@@ -70,58 +97,46 @@ async def cmd_start(
                 .first()
             )
             if not existing:
-                member_count = db.query(Membership).filter(Membership.shop_id == target_shop.id).count()
-                role = "admin" if member_count == 0 else "worker"
+                count = db.query(Membership).filter(Membership.shop_id == target_shop.id).count()
+                role = "admin" if count == 0 else "worker"
                 existing = Membership(user_id=user.id, shop_id=target_shop.id, role=role)
                 db.add(existing)
                 db.commit()
-                logger.info(f"New membership: user={user.id} shop={target_shop.id} role={role}")
-
             shop = target_shop
             membership = existing
 
     except Exception as e:
         logger.error(f"/start DB error: {e}\n{traceback.format_exc()}")
-        await message.answer(
-            "⚠️ Ошибка при подключении к сервису. Попробуйте ещё раз.",
-            reply_markup=main_menu_kb(is_admin=False),
-        )
+        await message.answer(t("shop_error", lang))
         return
 
-    # ── No shop context ───────────────────────────────────────────────────
     if not shop:
-        await message.answer(
-            "👋 Добро пожаловать в *AutoPilot Pro*!\n\n"
-            "Для подключения к автосервису используйте пригласительную ссылку "
-            "или создайте свой сервис командой /newshop",
-            parse_mode="Markdown",
-        )
+        await message.answer(t("welcome_no_shop", lang), parse_mode="Markdown")
         return
 
-    # ── Greeting ──────────────────────────────────────────────────────────
+    await _send_greeting(message, db, user, lang, shop, membership)
+
+
+async def _send_greeting(message, db, user, lang, shop, membership):
+    if not shop:
+        await message.answer(t("welcome_no_shop", lang), parse_mode="Markdown")
+        return
+
     is_admin = membership and membership.role == "admin"
-    role_label = "Администратор" if is_admin else "Механик"
-
     await message.answer(
-        f"👋 Привет, *{message.from_user.first_name}*!\n\n"
-        f"🏪 Сервис: *{shop.name}*\n"
-        f"👤 Роль: _{role_label}_\n\n"
-        f"{'Управляйте сервисом через ⚙️ Админ панель.' if is_admin else 'Отправьте описание ремонта — текстом или голосом.'}",
+        t("greeting", lang,
+          name=message.from_user.first_name if hasattr(message, 'from_user') else "...",
+          shop=shop.name,
+          role=t("role_admin" if is_admin else "role_worker", lang),
+          tip=t("tip_admin" if is_admin else "tip_worker", lang)),
         parse_mode="Markdown",
-        reply_markup=main_menu_kb(is_admin=is_admin),
+        reply_markup=main_menu_kb(is_admin=is_admin, lang=lang),
     )
-    logger.info(f"/start: sent greeting to user={message.from_user.id} is_admin={is_admin}")
-
     if is_admin and not shop.logo_path:
-        await message.answer(
-            "💡 *Совет:* Настройте ваш сервис:\n"
-            "• Загрузите логотип\n"
-            "• Укажите цены на работы\n"
-            "• Загрузите прайс запчастей\n\n"
-            "➡️ Нажмите «⚙️ Админ панель»",
-            parse_mode="Markdown",
-        )
+        await message.answer(t("setup_tip", lang), parse_mode="Markdown")
 
+
+# ── /newshop ──────────────────────────────────────────────────────────────────
 
 @router.message(Command("newshop"))
 async def cmd_new_shop(
@@ -129,45 +144,42 @@ async def cmd_new_shop(
     db: Session | None = None,
     user: User | None = None,
 ):
-    logger.info(f"/newshop from user={message.from_user.id}")
+    logger.info(f"/newshop user={message.from_user.id}")
+    lang = user.language if user else "ru"
 
     if db is None or user is None:
-        await message.answer("⚠️ Сервис временно недоступен. Попробуйте позже.")
+        await message.answer(t("service_unavailable", lang))
         return
 
     try:
         slug = secrets.token_hex(4).upper()
-        shop = Shop(slug=slug, name=f"Сервис {message.from_user.first_name}")
+        shop = Shop(
+            slug=slug,
+            name=message.from_user.first_name or "AutoPilot Pro",
+            language=lang,
+        )
         db.add(shop)
         db.flush()
-
         sub = Subscription(
             shop_id=shop.id,
             plan="trial",
             status="active",
-            trial_ends_at=datetime.utcnow() + timedelta(days=14),
+            trial_ends_at=datetime.utcnow() + timedelta(hours=settings.TRIAL_HOURS),
         )
         db.add(sub)
-
         mem = Membership(user_id=user.id, shop_id=shop.id, role="admin")
         db.add(mem)
         db.commit()
-        logger.info(f"New shop via /newshop: slug={slug} user={user.id}")
-
+        logger.info(f"/newshop created slug={slug} user={user.id}")
     except Exception as e:
-        logger.error(f"/newshop DB error: {e}\n{traceback.format_exc()}")
-        await message.answer("⚠️ Не удалось создать сервис. Попробуйте ещё раз.")
+        logger.error(f"/newshop error: {e}\n{traceback.format_exc()}")
+        await message.answer(t("shop_error", lang))
         return
 
     bot_username = (await message.bot.get_me()).username
-    invite_link = f"https://t.me/{bot_username}?start={slug}"
-
+    invite = f"https://t.me/{bot_username}?start={slug}"
     await message.answer(
-        f"✅ Сервис создан!\n\n"
-        f"🏪 Название: *{shop.name}*\n"
-        f"🔑 Код: `{slug}`\n\n"
-        f"📎 Пригласительная ссылка:\n`{invite_link}`\n\n"
-        f"Отправьте её механикам, чтобы они подключились.",
+        t("shop_created", lang, name=shop.name, slug=slug, link=invite),
         parse_mode="Markdown",
-        reply_markup=main_menu_kb(is_admin=True),
+        reply_markup=main_menu_kb(is_admin=True, lang=lang),
     )

@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     WEBHOOK_URL: str = ""
     SECRET_TOKEN: str = "autopilot_secret"
     PORT: int = 8080
+    SUPERADMIN_ID: int = 1207611858
+    KASPI_PHONE: str = "+77077727528"
+    SUBSCRIPTION_PRICE: int = 5000
+    TRIAL_HOURS: int = 12
 
     class Config:
         env_file = ".env"

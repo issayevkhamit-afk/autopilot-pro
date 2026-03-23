@@ -15,6 +15,8 @@ from app.middlewares.shop_context import ShopContextMiddleware
 from app.handlers.start import router as start_router
 from app.handlers.admin import router as admin_router
 from app.handlers.worker import router as worker_router
+from app.handlers.payment import router as payment_router
+from app.handlers.superadmin import router as superadmin_router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -31,7 +33,9 @@ bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
 
 dp.update.middleware(ShopContextMiddleware())
+dp.include_router(superadmin_router)
 dp.include_router(start_router)
+dp.include_router(payment_router)
 dp.include_router(admin_router)
 dp.include_router(worker_router)
 
@@ -49,6 +53,7 @@ async def on_startup():
             BotCommand(command="start", description="Начать / подключиться к сервису"),
             BotCommand(command="newshop", description="Создать новый автосервис"),
             BotCommand(command="admin", description="Панель администратора"),
+            BotCommand(command="sa", description="Суперадмин панель"),
         ])
         logger.info("Bot commands set OK")
     except Exception as e:
