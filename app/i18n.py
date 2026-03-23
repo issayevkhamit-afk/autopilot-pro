@@ -7,9 +7,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "btn_ru": "🇷🇺 Русский",
         "btn_kz": "🇰🇿 Қазақша",
         "btn_uz": "🇺🇿 O'zbekcha",
+        "btn_kg": "🇰🇬 Кыргызча",
         "language_set_ru": "✅ Язык установлен: Русский",
         "language_set_kz": "✅ Язык установлен: Қазақша",
         "language_set_uz": "✅ Язык установлен: O'zbekcha",
+        "language_set_kg": "✅ Язык установлен: Кыргызча",
+        "country_set_kz": "🇰🇿 Страна: Казахстан | Валюта: KZT ₸\nВыберите язык:",
+        "country_set_uz": "🇺🇿 Страна: Узбекистан | Валюта: UZS сум\nВыберите язык:",
+        "country_set_kg": "🇰🇬 Страна: Кыргызстан | Валюта: KGS сом\nВыберите язык:",
+        "choose_country": "🌍 Выберите страну и валюту:",
         # Start
         "welcome_no_shop": (
             "👋 Добро пожаловать в *AutoPilot Pro*!\n\n"
@@ -74,9 +80,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "btn_ru": "🇷🇺 Русский",
         "btn_kz": "🇰🇿 Қазақша",
         "btn_uz": "🇺🇿 O'zbekcha",
+        "btn_kg": "🇰🇬 Кыргызча",
         "language_set_ru": "✅ Тіл орнатылды: Русский",
         "language_set_kz": "✅ Тіл орнатылды: Қазақша",
         "language_set_uz": "✅ Тіл орнатылды: O'zbekcha",
+        "language_set_kg": "✅ Тіл орнатылды: Кыргызча",
+        "country_set_kz": "🇰🇿 Ел: Қазақстан | Валюта: KZT ₸\nТілді таңдаңыз:",
+        "country_set_uz": "🇺🇿 Ел: Өзбекстан | Валюта: UZS сум\nТілді таңдаңыз:",
+        "country_set_kg": "🇰🇬 Ел: Қырғызстан | Валюта: KGS сом\nТілді таңдаңыз:",
+        "choose_country": "🌍 Елді және валютаны таңдаңыз:",
         # Start
         "welcome_no_shop": (
             "👋 *AutoPilot Pro* қош келдіңіз!\n\n"
@@ -141,9 +153,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "btn_ru": "🇷🇺 Русский",
         "btn_kz": "🇰🇿 Қазақша",
         "btn_uz": "🇺🇿 O'zbekcha",
+        "btn_kg": "🇰🇬 Кыргызча",
         "language_set_ru": "✅ Til o'rnatildi: Русский",
         "language_set_kz": "✅ Til o'rnatildi: Қазақша",
         "language_set_uz": "✅ Til o'rnatildi: O'zbekcha",
+        "language_set_kg": "✅ Til o'rnatildi: Кыргызча",
+        "country_set_kz": "🇰🇿 Mamlakat: Qozog'iston | Valyuta: KZT ₸\nTilni tanlang:",
+        "country_set_uz": "🇺🇿 Mamlakat: O'zbekiston | Valyuta: UZS so'm\nTilni tanlang:",
+        "country_set_kg": "🇰🇬 Mamlakat: Qirg'iziston | Valyuta: KGS som\nTilni tanlang:",
+        "choose_country": "🌍 Mamlakat va valyutani tanlang:",
         # Start
         "welcome_no_shop": (
             "👋 *AutoPilot Pro*ga xush kelibsiz!\n\n"
@@ -201,6 +219,79 @@ TEXTS: dict[str, dict[str, str]] = {
         "btn_confirm_pdf": "✅ Tasdiqlash va PDF",
         "btn_cancel_estimate": "🗑 Bekor qilish",
         "btn_cancel": "❌ Bekor qilish",
+    },
+    "kg": {
+        # Language picker
+        "choose_language": "🌐 Интерфейс тилин тандаңыз:",
+        "btn_ru": "🇷🇺 Орусча",
+        "btn_kz": "🇰🇿 Қазақша",
+        "btn_uz": "🇺🇿 O'zbekcha",
+        "btn_kg": "🇰🇬 Кыргызча",
+        "language_set_ru": "✅ Тил коюлду: Орусча",
+        "language_set_kz": "✅ Тил коюлду: Қазақша",
+        "language_set_uz": "✅ Тил коюлду: O'zbekcha",
+        "language_set_kg": "✅ Тил коюлду: Кыргызча",
+        "country_set_kz": "🇰🇿 Өлкө: Казакстан | Валюта: KZT ₸\nТилди тандаңыз:",
+        "country_set_uz": "🇺🇿 Өлкө: Өзбекстан | Валюта: UZS сом\nТилди тандаңыз:",
+        "country_set_kg": "🇰🇬 Өлкө: Кыргызстан | Валюта: KGS сом\nТилди тандаңыз:",
+        "choose_country": "🌍 Өлкөнү жана валютаны тандаңыз:",
+        # Start
+        "welcome_no_shop": (
+            "👋 *AutoPilot Pro*го кош келиңиз!\n\n"
+            "Авто сервиске кошулуу үчүн чакыруу шилтемесин колдонуңуз "
+            "же /newshop буйругу менен өз сервисиңизди түзүңүз"
+        ),
+        "greeting": "👋 Саламатсызбы, *{name}*!\n\n🏪 Сервис: *{shop}*\n👤 Роль: _{role}_\n\n{tip}",
+        "role_admin": "Администратор",
+        "role_worker": "Механик",
+        "tip_admin": "Сервисти ⚙️ Админ панель аркылуу башкарыңыз.",
+        "tip_worker": "Оңдоо сүрөттөмөсүн жіберіңіз — текст же үн.",
+        "setup_tip": "💡 *Кеңеш:* ⚙️ Админ панель бөлүмүндө жумуш баасын көрсөтүңүз.",
+        # Shop creation
+        "shop_created": (
+            "✅ Сервис түзүлдү!\n\n"
+            "🏪 Аты: *{name}*\n🔑 Код: `{slug}`\n\n"
+            "📎 Чакыруу шилтемеси:\n`{link}`\n\nМеханиктерге жіберіңіз."
+        ),
+        "shop_error": "⚠️ Сервис түзүлгөн жок. Кайра аракет кылыңыз.",
+        "service_unavailable": "⚠️ Сервис убактылуу жеткиликсиз. Кийинчерээк аракет кылыңыз.",
+        # Subscription
+        "trial_expired": (
+            "⏰ *Сыноо мезгили бүттү*\n\n"
+            "Улантуу үчүн жазылымды төлөңүз:\n"
+            "💰 *5 000 сом / ай*"
+        ),
+        "subscription_inactive": (
+            "🔒 *Жазылым активдүү эмес*\n\n"
+            "Иштөөнү улантуу үчүн жазылымды төлөңүз:\n"
+            "💰 *5 000 сом / ай*"
+        ),
+        "payment_instructions": (
+            "💳 *Төлөм*\n\n"
+            "Номерге *5 000 сом* которуңуз:\n"
+            "📱 `{phone}`\n\n"
+            "Комментарийде жазыңыз: `{slug}`\n\n"
+            "Төлөгөндөн кийин «✅ Төлөдүм» басыңыз"
+        ),
+        "payment_pending": "⏳ Төлөм текшерилүүдө. Бир нече мүнөттөн кийин активдештиребиз.",
+        "payment_confirmed": "✅ Жазылым 30 күнгө активдештирилди! Жакшы иш 🚀",
+        # Worker
+        "no_shop": "❗ Сервиске байланбадыңыз. Чакыруу шилтемесин колдонуңуз.",
+        "processing": "⏳ Иштетилүүдө...",
+        "estimate_ready": "📋 *Алдын ала смета:*\n\n{text}",
+        "estimate_confirmed": "✅ Смета ырасталды! PDF даярдалууда...",
+        "estimate_cancelled": "❌ Смета жокко чыгарылды.",
+        "voice_error": "⚠️ Үндү таанып болгон жок. Кайра аракет кылыңыз.",
+        "ai_error": "⚠️ Иштетүү катасы. Кайра аракет кылыңыз.",
+        "price_learned": "💾 Баа сакталды: {name} — {price} сом",
+        # Buttons
+        "btn_new_estimate": "🔧 Жаңы смета",
+        "btn_admin_panel": "⚙️ Админ панель",
+        "btn_pay": "💳 5 000 сом төлөө",
+        "btn_paid": "✅ Төлөдүм",
+        "btn_confirm_pdf": "✅ Ырастап PDF",
+        "btn_cancel_estimate": "🗑 Жокко чыгаруу",
+        "btn_cancel": "❌ Жокко чыгаруу",
     },
 }
 

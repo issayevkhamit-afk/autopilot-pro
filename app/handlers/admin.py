@@ -21,7 +21,7 @@ from app.models.labor_price import LaborPrice
 from app.states.admin_states import AdminStates
 from app.keyboards.admin_kb import (
     admin_menu_kb, admin_prices_kb,
-    admin_settings_kb, cancel_kb, language_picker_kb,
+    admin_settings_kb, cancel_kb, country_picker_kb, lang_for_country_kb, COUNTRY_CONFIG,
 )
 from app.keyboards.worker_kb import main_menu_kb
 
@@ -328,14 +328,36 @@ async def estimates_history(call: CallbackQuery, membership: Membership | None, 
     await call.answer()
 
 
-# ── LANGUAGE ───────────────────────────────────────────────────────────────
+# ── COUNTRY & LANGUAGE ─────────────────────────────────────────────────────
 
-@router.callback_query(F.data == "admin:language")
-async def language_menu(call: CallbackQuery, membership: Membership | None):
+@router.callback_query(F.data == "admin:country")
+async def country_menu(call: CallbackQuery, membership: Membership | None, user=None):
     if _admin_gate(membership):
         await call.answer("⛔", show_alert=True)
         return
-    await call.message.edit_text("🌐 Выберите язык интерфейса:", reply_markup=language_picker_kb())
+    lang = user.language if user else "ru"
+    await call.message.edit_text(t("choose_country", lang), reply_markup=country_picker_kb())
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("setcountry:"))
+async def set_country(call: CallbackQuery, membership: Membership | None, shop: Shop, db: Session, user=None):
+    if _admin_gate(membership):
+        await call.answer("⛔", show_alert=True)
+        return
+    country = call.data.split(":")[1]
+    if country not in COUNTRY_CONFIG:
+        await call.answer("❌ Неизвестная страна", show_alert=True)
+        return
+    currency, _ = COUNTRY_CONFIG[country]
+    shop.currency = currency
+    shop.country = country
+    db.commit()
+    lang = user.language if user else "ru"
+    await call.message.edit_text(
+        t(f"country_set_{country}", lang),
+        reply_markup=lang_for_country_kb(country),
+    )
     await call.answer()
 
 
@@ -344,8 +366,9 @@ async def set_language(call: CallbackQuery, membership: Membership | None, db: S
     if _admin_gate(membership):
         await call.answer("⛔", show_alert=True)
         return
-    lang = call.data.split(":")[1]
-    if lang not in ("ru", "kz", "uz"):
+    parts = call.data.split(":")
+    lang = parts[1]
+    if lang not in ("ru", "kz", "uz", "kg"):
         await call.answer("❌ Неизвестный язык", show_alert=True)
         return
     if user:

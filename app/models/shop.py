@@ -11,6 +11,7 @@ class Shop(Base):
     logo_path = Column(String(500), nullable=True)
     city = Column(String(100), nullable=True)
     phone = Column(String(50), nullable=True)
+    country = Column(String(5), default="kz")
     language = Column(String(5), default="ru")
     currency = Column(String(10), default="KZT")
     address = Column(Text, nullable=True)
